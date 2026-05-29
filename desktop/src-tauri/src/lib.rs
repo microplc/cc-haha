@@ -217,6 +217,8 @@ mod macos_notifications {
     }
 }
 
+mod webview_panel;
+
 const SERVER_STARTUP_LOG_LIMIT: usize = 80;
 const SERVER_BIND_HOST: &str = "0.0.0.0";
 const SERVER_CONTROL_HOST: &str = "127.0.0.1";
