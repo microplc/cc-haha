@@ -213,6 +213,36 @@ export class ProviderService {
     await this.writeIndex(index)
   }
 
+  /**
+   * Reorder saved providers to match the given id order.
+   *
+   * The display order is simply the array order in providers.json, so reordering
+   * persists by rewriting the array — no separate `order` field is needed.
+   * `orderedIds` must be a permutation of the existing provider ids (same members,
+   * no duplicates, none missing); otherwise the request is rejected so a stale
+   * client can't silently drop or duplicate a provider.
+   */
+  async reorderProviders(orderedIds: string[]): Promise<SavedProvider[]> {
+    const index = await this.readIndex()
+
+    const currentIds = index.providers.map((p) => p.id)
+    const orderedSet = new Set(orderedIds)
+    const isPermutation =
+      orderedIds.length === currentIds.length &&
+      orderedSet.size === orderedIds.length &&
+      currentIds.every((id) => orderedSet.has(id))
+
+    if (!isPermutation) {
+      throw ApiError.badRequest('orderedIds must be a permutation of existing provider ids')
+    }
+
+    const byId = new Map(index.providers.map((p) => [p.id, p]))
+    index.providers = orderedIds.map((id) => byId.get(id) as SavedProvider)
+    await this.writeIndex(index)
+
+    return index.providers
+  }
+
   // --- Activation ---
 
   async activateProvider(id: string): Promise<void> {

@@ -19,6 +19,7 @@ const {
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
+    reorder: vi.fn(),
     activate: vi.fn(),
     activateOfficial: vi.fn(),
     test: vi.fn(),
@@ -179,5 +180,71 @@ describe('providerStore runtime refresh', () => {
 
     expect(settingsSetModelMock).toHaveBeenCalledWith('model-main')
     expect(settingsFetchAllMock).toHaveBeenCalled()
+  })
+})
+
+describe('providerStore reorderProviders', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    chatStoreState.sessions = {}
+    runtimeStoreState.selections = {}
+    providersApiMock.list.mockResolvedValue({ providers: [], activeId: null })
+  })
+
+  it('optimistically applies the new order before the request resolves', async () => {
+    const a = makeProvider({ id: 'a', name: 'A' })
+    const b = makeProvider({ id: 'b', name: 'B' })
+    const c = makeProvider({ id: 'c', name: 'C' })
+
+    let resolveReorder: (value: { providers: SavedProvider[] }) => void = () => {}
+    providersApiMock.reorder.mockReturnValue(
+      new Promise((resolve) => {
+        resolveReorder = resolve
+      }),
+    )
+
+    const { useProviderStore } = await import('./providerStore')
+    useProviderStore.setState({ providers: [a, b, c], activeId: null })
+
+    const promise = useProviderStore.getState().reorderProviders(['c', 'a', 'b'])
+
+    // Optimistic update is visible immediately, before the API resolves.
+    expect(useProviderStore.getState().providers.map((p) => p.id)).toEqual(['c', 'a', 'b'])
+
+    resolveReorder({ providers: [c, a, b] })
+    await promise
+
+    expect(providersApiMock.reorder).toHaveBeenCalledWith(['c', 'a', 'b'])
+    expect(useProviderStore.getState().providers.map((p) => p.id)).toEqual(['c', 'a', 'b'])
+  })
+
+  it('rolls back to the previous order when the request fails', async () => {
+    const a = makeProvider({ id: 'a', name: 'A' })
+    const b = makeProvider({ id: 'b', name: 'B' })
+    providersApiMock.reorder.mockRejectedValue(new Error('network down'))
+
+    const { useProviderStore } = await import('./providerStore')
+    useProviderStore.setState({ providers: [a, b], activeId: null })
+
+    await useProviderStore.getState().reorderProviders(['b', 'a'])
+
+    // Rolls back to the pre-drag order and surfaces the error.
+    expect(useProviderStore.getState().providers.map((p) => p.id)).toEqual(['a', 'b'])
+    expect(useProviderStore.getState().error).toBe('network down')
+  })
+
+  it('refetches instead of reordering when the id set is stale', async () => {
+    const a = makeProvider({ id: 'a', name: 'A' })
+    const b = makeProvider({ id: 'b', name: 'B' })
+    providersApiMock.list.mockResolvedValue({ providers: [a, b], activeId: null })
+
+    const { useProviderStore } = await import('./providerStore')
+    useProviderStore.setState({ providers: [a, b], activeId: null })
+
+    // Only one id supplied — the list changed under us, so don't persist a bad order.
+    await useProviderStore.getState().reorderProviders(['a'])
+
+    expect(providersApiMock.reorder).not.toHaveBeenCalled()
+    expect(providersApiMock.list).toHaveBeenCalled()
   })
 })

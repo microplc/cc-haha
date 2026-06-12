@@ -625,6 +625,81 @@ describe('ProviderService', () => {
     })
   })
 
+  // ─── reorderProviders ────────────────────────────────────────────────────
+
+  describe('reorderProviders', () => {
+    test('should reorder providers to match the given id order and persist it', async () => {
+      const svc = new ProviderService()
+      const a = await svc.addProvider(sampleInput({ name: 'A' }))
+      const b = await svc.addProvider(sampleInput({ name: 'B' }))
+      const c = await svc.addProvider(sampleInput({ name: 'C' }))
+
+      const result = await svc.reorderProviders([c.id, a.id, b.id])
+      expect(result.map((p) => p.name)).toEqual(['C', 'A', 'B'])
+
+      // Persisted order survives a fresh read
+      const { providers } = await svc.listProviders()
+      expect(providers.map((p) => p.name)).toEqual(['C', 'A', 'B'])
+
+      const config = await readProvidersConfig()
+      expect((config.providers as Array<{ name: string }>).map((p) => p.name)).toEqual(['C', 'A', 'B'])
+    })
+
+    test('should not change activeId when reordering', async () => {
+      const svc = new ProviderService()
+      const a = await svc.addProvider(sampleInput({ name: 'A' }))
+      const b = await svc.addProvider(sampleInput({ name: 'B' }))
+      await svc.activateProvider(a.id)
+
+      await svc.reorderProviders([b.id, a.id])
+
+      const { activeId } = await svc.listProviders()
+      expect(activeId).toBe(a.id)
+    })
+
+    test('should throw 400 when orderedIds is missing a provider', async () => {
+      const svc = new ProviderService()
+      const a = await svc.addProvider(sampleInput({ name: 'A' }))
+      await svc.addProvider(sampleInput({ name: 'B' }))
+
+      try {
+        await svc.reorderProviders([a.id])
+        expect(true).toBe(false)
+      } catch (err: unknown) {
+        const apiErr = err as { statusCode: number }
+        expect(apiErr.statusCode).toBe(400)
+      }
+    })
+
+    test('should throw 400 when orderedIds contains an unknown id', async () => {
+      const svc = new ProviderService()
+      const a = await svc.addProvider(sampleInput({ name: 'A' }))
+      const b = await svc.addProvider(sampleInput({ name: 'B' }))
+
+      try {
+        await svc.reorderProviders([a.id, b.id, 'ghost-id'])
+        expect(true).toBe(false)
+      } catch (err: unknown) {
+        const apiErr = err as { statusCode: number }
+        expect(apiErr.statusCode).toBe(400)
+      }
+    })
+
+    test('should throw 400 when orderedIds contains duplicates', async () => {
+      const svc = new ProviderService()
+      const a = await svc.addProvider(sampleInput({ name: 'A' }))
+      await svc.addProvider(sampleInput({ name: 'B' }))
+
+      try {
+        await svc.reorderProviders([a.id, a.id])
+        expect(true).toBe(false)
+      } catch (err: unknown) {
+        const apiErr = err as { statusCode: number }
+        expect(apiErr.statusCode).toBe(400)
+      }
+    })
+  })
+
   // ─── activateProvider ────────────────────────────────────────────────────
 
   describe('activateProvider', () => {
@@ -1516,6 +1591,54 @@ describe('Providers API', () => {
     const res = await handleProvidersApi(req, url, segments)
 
     expect(res.status).toBe(400)
+  })
+
+  // ─── PUT /api/providers/reorder ──────────────────────────────────────────
+
+  test('PUT /api/providers/reorder should reorder providers', async () => {
+    const svc = new ProviderService()
+    const a = await svc.addProvider(sampleInput({ name: 'A' }))
+    const b = await svc.addProvider(sampleInput({ name: 'B' }))
+
+    const { req, url, segments } = makeRequest('PUT', '/api/providers/reorder', {
+      orderedIds: [b.id, a.id],
+    })
+    const res = await handleProvidersApi(req, url, segments)
+
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { providers: { name: string }[] }
+    expect(body.providers.map((p) => p.name)).toEqual(['B', 'A'])
+  })
+
+  test('PUT /api/providers/reorder should return 400 for a non-permutation', async () => {
+    const svc = new ProviderService()
+    const a = await svc.addProvider(sampleInput({ name: 'A' }))
+    await svc.addProvider(sampleInput({ name: 'B' }))
+
+    const { req, url, segments } = makeRequest('PUT', '/api/providers/reorder', {
+      orderedIds: [a.id], // missing B
+    })
+    const res = await handleProvidersApi(req, url, segments)
+
+    expect(res.status).toBe(400)
+  })
+
+  test('PUT /api/providers/reorder should return 400 for empty orderedIds', async () => {
+    const { req, url, segments } = makeRequest('PUT', '/api/providers/reorder', {
+      orderedIds: [],
+    })
+    const res = await handleProvidersApi(req, url, segments)
+
+    expect(res.status).toBe(400)
+  })
+
+  test('POST /api/providers/reorder should be method-not-allowed', async () => {
+    const { req, url, segments } = makeRequest('POST', '/api/providers/reorder', {
+      orderedIds: [],
+    })
+    const res = await handleProvidersApi(req, url, segments)
+
+    expect(res.status).toBe(405)
   })
 
   test('POST /api/providers should return 400 for invalid auto compact window', async () => {

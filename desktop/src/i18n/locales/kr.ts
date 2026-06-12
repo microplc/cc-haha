@@ -383,6 +383,7 @@ export const kr: Record<TranslationKey, string> = {
   'settings.providers.setDefault': '기본값으로 설정',
   'settings.providers.test': '테스트',
   'settings.providers.edit': '편집',
+  'settings.providers.dragToReorder': '드래그하여 순서 변경',
   'settings.providers.requestFailed': '요청에 실패했습니다',
   'settings.providers.addTitle': '공급자 추가',
   'settings.providers.editTitle': '공급자 편집',

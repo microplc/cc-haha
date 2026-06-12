@@ -381,6 +381,7 @@ export const en = {
   'settings.providers.setDefault': 'Set default',
   'settings.providers.test': 'Test',
   'settings.providers.edit': 'Edit',
+  'settings.providers.dragToReorder': 'Drag to reorder',
   'settings.providers.requestFailed': 'Request failed',
   'settings.providers.addTitle': 'Add Provider',
   'settings.providers.editTitle': 'Edit Provider',

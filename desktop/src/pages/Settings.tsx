@@ -229,6 +229,7 @@ function ProviderSettings() {
     fetchProviders,
     fetchPresets,
     deleteProvider,
+    reorderProviders,
     activateProvider,
     activateOfficial,
     testProvider,
@@ -240,6 +241,8 @@ function ProviderSettings() {
   const [pendingDeleteProvider, setPendingDeleteProvider] = useState<SavedProvider | null>(null)
   const [isDeletingProvider, setIsDeletingProvider] = useState(false)
   const [testResults, setTestResults] = useState<Record<string, { loading: boolean; result?: ProviderTestResult }>>({})
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
 
   useEffect(() => {
     void fetchProviders()
@@ -287,6 +290,46 @@ function ProviderSettings() {
   const handleActivateOfficial = async () => {
     await activateOfficial()
     await fetchSettings()
+  }
+
+  const handleProviderDragStart = (event: React.DragEvent, id: string) => {
+    setDraggingId(id)
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', id)
+  }
+
+  const handleProviderDragOver = (event: React.DragEvent, overId: string) => {
+    if (!draggingId || draggingId === overId) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    if (dragOverId !== overId) setDragOverId(overId)
+  }
+
+  const clearProviderDragState = () => {
+    setDraggingId(null)
+    setDragOverId(null)
+  }
+
+  const handleProviderDrop = (event: React.DragEvent, targetId: string) => {
+    event.preventDefault()
+    const sourceId = draggingId || event.dataTransfer.getData('text/plain')
+    if (!sourceId || sourceId === targetId) {
+      clearProviderDragState()
+      return
+    }
+
+    const ids = providers.map((p) => p.id)
+    const from = ids.indexOf(sourceId)
+    const to = ids.indexOf(targetId)
+    if (from === -1 || to === -1) {
+      clearProviderDragState()
+      return
+    }
+
+    ids.splice(from, 1)
+    ids.splice(to, 0, sourceId)
+    clearProviderDragState()
+    void reorderProviders(ids)
   }
 
   const isClaudeOfficialActive = hasLoadedProviders && activeId === null
@@ -382,12 +425,28 @@ function ProviderSettings() {
             return (
               <div
                 key={provider.id}
-                className={`relative flex items-center gap-4 px-4 py-3.5 rounded-xl border transition-all group ${
+                onDragOver={(e) => handleProviderDragOver(e, provider.id)}
+                onDrop={(e) => handleProviderDrop(e, provider.id)}
+                onDragLeave={() => setDragOverId((cur) => (cur === provider.id ? null : cur))}
+                className={`relative flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-all group ${
                   isActive
                     ? 'border-[var(--color-brand)] bg-[var(--color-surface-container)] shadow-[var(--shadow-focus-ring)]'
                     : 'border-[var(--color-border)] hover:border-[var(--color-border-focus)]'
+                } ${draggingId === provider.id ? 'opacity-50' : ''} ${
+                  dragOverId === provider.id ? 'border-[var(--color-brand)] border-dashed' : ''
                 }`}
               >
+                <span
+                  draggable
+                  onDragStart={(e) => handleProviderDragStart(e, provider.id)}
+                  onDragEnd={clearProviderDragState}
+                  role="button"
+                  aria-label={t('settings.providers.dragToReorder')}
+                  title={t('settings.providers.dragToReorder')}
+                  className="material-symbols-outlined text-[18px] text-[var(--color-text-tertiary)] flex-shrink-0 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity hover:text-[var(--color-text-secondary)]"
+                >
+                  drag_indicator
+                </span>
                 <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isActive ? 'bg-[var(--color-success)]' : 'bg-[var(--color-text-tertiary)]'}`} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">

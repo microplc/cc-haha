@@ -34,6 +34,7 @@ type ProviderStore = {
   createProvider: (input: CreateProviderInput) => Promise<SavedProvider>
   updateProvider: (id: string, input: UpdateProviderInput) => Promise<SavedProvider>
   deleteProvider: (id: string) => Promise<void>
+  reorderProviders: (orderedIds: string[]) => Promise<void>
   activateProvider: (id: string) => Promise<void>
   activateOfficial: () => Promise<void>
   testProvider: (id: string, overrides?: { baseUrl?: string; modelId?: string; apiFormat?: string; authStrategy?: string }) => Promise<ProviderTestResult>
@@ -143,6 +144,29 @@ export const useProviderStore = create<ProviderStore>((set, get) => ({
   deleteProvider: async (id) => {
     await providersApi.delete(id)
     await get().fetchProviders()
+  },
+
+  reorderProviders: async (orderedIds) => {
+    const previous = get().providers
+    // Optimistically reorder locally so the drag feels instant…
+    const byId = new Map(previous.map((p) => [p.id, p]))
+    const next = orderedIds
+      .map((id) => byId.get(id))
+      .filter((p): p is SavedProvider => p !== undefined)
+    // Bail out if the id set is stale (e.g. a provider was deleted mid-drag).
+    if (next.length !== previous.length) {
+      await get().fetchProviders()
+      return
+    }
+    set({ providers: next })
+    try {
+      const { providers } = await providersApi.reorder(orderedIds)
+      set({ providers })
+    } catch (err) {
+      // …and roll back to the pre-drag order if persistence fails. `previous`
+      // is the server's last-known truth, so no refetch is needed.
+      set({ providers: previous, error: err instanceof Error ? err.message : String(err) })
+    }
   },
 
   activateProvider: async (id) => {

@@ -98,6 +98,11 @@ export const TestProviderSchema = z.object({
   apiFormat: ApiFormatSchema.default('anthropic'),
 })
 
+export const ReorderProvidersSchema = z.object({
+  // A permutation of the existing saved provider ids, in the desired display order.
+  orderedIds: z.array(z.string().min(1)).min(1),
+})
+
 // TypeScript types
 export type ModelMapping = z.infer<typeof ModelMappingSchema>
 export type SavedProvider = z.infer<typeof SavedProviderSchema>
@@ -105,6 +110,7 @@ export type ProvidersIndex = z.infer<typeof ProvidersIndexSchema>
 export type CreateProviderInput = z.infer<typeof CreateProviderSchema>
 export type UpdateProviderInput = z.infer<typeof UpdateProviderSchema>
 export type TestProviderInput = z.infer<typeof TestProviderSchema>
+export type ReorderProvidersInput = z.infer<typeof ReorderProvidersSchema>
 
 export interface ProviderTestStepResult {
   success: boolean

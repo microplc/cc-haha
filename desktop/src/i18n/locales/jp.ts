@@ -383,6 +383,7 @@ export const jp: Record<TranslationKey, string> = {
   'settings.providers.setDefault': 'デフォルトに設定',
   'settings.providers.test': 'テスト',
   'settings.providers.edit': '編集',
+  'settings.providers.dragToReorder': 'ドラッグして並べ替え',
   'settings.providers.requestFailed': 'リクエストに失敗しました',
   'settings.providers.addTitle': 'プロバイダーを追加',
   'settings.providers.editTitle': 'プロバイダーを編集',

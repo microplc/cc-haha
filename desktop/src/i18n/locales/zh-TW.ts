@@ -383,6 +383,7 @@ export const zh: Record<TranslationKey, string> = {
   'settings.providers.setDefault': '設為預設',
   'settings.providers.test': '測試',
   'settings.providers.edit': '編輯',
+  'settings.providers.dragToReorder': '拖曳排序',
   'settings.providers.requestFailed': '請求失敗',
   'settings.providers.addTitle': '新增服務商',
   'settings.providers.editTitle': '編輯服務商',
